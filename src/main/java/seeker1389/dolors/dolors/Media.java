@@ -39,12 +39,20 @@ public class Media {
     Media(){
          //default cons.
     }
-    int start(String link) throws MalformedURLException {
+    int start(String link)  {
+        System.out.println("[-log-]-----------newLik------------------");
+        System.out.println("link- "+link);
+        System.err.println("[-log-]Starting scraper!");
+
         this.link=link;
-        hostUrl = new URL(link);
+        try{
+            hostUrl = new URL(link);
+        }catch (Exception e){
+            System.err.println("[-errCritical-]URL is malformatted, cannot create url object! ");
+        }
        Document page = getPage();
-//       getElements(page);   temporaryly
-        getWebPlayerLink(page);
+//     getElements(page);   temporaryly
+       getWebPlayerLink(page);
        return 0;
     }
     boolean checkUrl(String url) throws AppException {
@@ -60,6 +68,7 @@ public class Media {
                     .userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6")
                     .referrer("http://www.google.com")
                     .get();
+            System.err.println("[-log-]Downloded target page successfully!");
             return page;
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -117,12 +126,16 @@ public class Media {
     }
     String getWebPlayerLink(Document page){
 
+        System.err.println("[-log-]Starting webplayer scraper!");
         String frameLink = null;
         String webPlayerLink=null;
         String players[]={"dood","steamtape"};
         int i=0;
 
         Elements iframe = page.getElementsByTag("iframe");
+        if(iframe.isEmpty()){
+            System.out.println("---No iframe links found on the link----");
+        }
         for(Element ifr : iframe){
             frameLink = ifr.attr("src");
             System.err.println("iframe link found "+frameLink);

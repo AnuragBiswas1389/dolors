@@ -32,7 +32,8 @@ public class Db {
                     "jdbc:mysql://localhost:3306/videodb", "root", "seeker1389");
             Statement stmt = con.createStatement();
             int res=stmt.executeUpdate(statement);
-            ResultSet rs = stmt.executeQuery("select * from video");
+            System.out.println("ADDED to DB:");
+//            ResultSet rs = stmt.executeQuery("select * from video");
             if(res>0){
                 System.out.println("DB updated Successfully");
             }else{
@@ -47,9 +48,10 @@ public class Db {
     }
 
     public void starter(String args[]) {
+        //String data[]={id, webPlayerLink,site,absVidThumb,absVidType};
         String statement = createStatement(args);
         executeUpdate(statement);
-        System.out.println("DB initialized,,");
+        System.out.println("DB initialized for "+args[1]);
 
     }
 }
