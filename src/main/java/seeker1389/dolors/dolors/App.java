@@ -1,8 +1,5 @@
 package seeker1389.dolors.dolors;
 
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-
 import java.io.IOException;
 import java.util.Scanner;
 
@@ -15,12 +12,7 @@ public class App {
         System.out.println("Enter the url");
         url = input.nextLine();
 
-        Document page = Jsoup.connect(url)
-                .userAgent("Mozilla/5.0 (Windows NT 6.1; rv:80.0) Gecko/27132701 Firefox/78.7")
-                .data("name", "jsoup").get();
-
-        Media media = new Media();
-        media.dataExtractor(page);
+        new Crawler().getPageLinks(url);
 
     }
 }
