@@ -13,7 +13,7 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-public class Media {
+public class MediaScraper {
 
     private  String url ; //main url for the extraction of required data...
     private  String link;  // link of the page to be crawled...
@@ -22,7 +22,7 @@ public class Media {
 
     String links[]={}; //stores all the links in the page... used by getLinks method..
     int tempid=50;
-    Media(String link){
+    MediaScraper(String link){
         if(link!=""){
             this.link=link;
              hostUrl = null;
@@ -36,7 +36,7 @@ public class Media {
         }
 
     }//sets the source url
-    Media(){
+    MediaScraper(){
          //default cons.
     }
     int start(String link)  {

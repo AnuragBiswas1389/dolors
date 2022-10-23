@@ -6,6 +6,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.regex.Matcher;
@@ -15,17 +16,21 @@ import java.util.regex.Pattern;
 public class Crawler {
 
 
-    private HashSet<String> links;
-    Media media = new Media();
+    MediaScraper mediaScraper = new MediaScraper();
     private String baseUrl;
+    private URL sourceUrl;
+    boolean onlySource=false;
     public Crawler() {}
-   public Crawler(String url,String mode){
-        this.baseUrl=url; //sets the baseUrl to the starter url...
-        /*
-        When the crawling mode is set to the sequence,
-         then this method of crawling will be
-        invoked...
-         */
+   public Crawler(String url,String mode,boolean onlySource){
+
+       this.onlySource=onlySource;
+       this.baseUrl=url; //sets the baseUrl to the starter url...
+       try {
+           sourceUrl=new URL(baseUrl);  //sets the sorceUrl object...
+       }catch(Exception e){
+           System.err.println("url malformatted exception occured "+e);
+       }
+
         if(mode.equalsIgnoreCase("sequence")){
                 sequencePageNav(url);
         }
@@ -39,16 +44,16 @@ public class Crawler {
     }
 
 
-    public void randomPageNav(String URL) {
+   public void randomPageNav(String URL) {
         //4. Check if you have already crawled the URLs
         //(we are intentionally not checking for duplicate content in this example)
-        links = new HashSet<String>();
+        HashSet<String> links = new HashSet<String>();
         if (!links.contains(URL)) {
             try {
                 //4. (i) If not add it to the index
                 if (links.add(URL)) {
                     System.out.println("--Crawled link is "+URL+" ----------------------");
-                   media.start(URL);
+                   scraperDriver(URL);
                 }
 
                 //2. Fetch the HTML code
@@ -65,7 +70,8 @@ public class Crawler {
             }
         }
     }
-    public int[] getPageSequenceInfo(String url){
+
+   public int[] getPageSequenceInfo(String url){
         Pattern pattern = Pattern.compile("[^a-zA-Z][0-9]+[^a-zA-Z]?");
         Matcher matcher = pattern.matcher(url);
 
@@ -84,7 +90,7 @@ public class Crawler {
         //String target[]=new String[]{url.substring(0,res[1]+1),url.substring(res[2]-1)};
     }
 
-    void sequencePageNav(String baseUrl){
+   void sequencePageNav(String baseUrl){
 
         String url = baseUrl;
         int res[]=getPageSequenceInfo(baseUrl);
@@ -94,7 +100,7 @@ public class Crawler {
         }
         int pageNumber=res[0];
         String pageFrag[]=new String[]{url.substring(0,res[1]+1),url.substring(res[2]-1)};
-        int defaultPageLimit=50;
+        int defaultPageLimit=100;
         while(pageNumber<=defaultPageLimit){
             String genPageLink=pageFrag[0]+pageNumber+pageFrag[1];
             System.err.println("[-log-]generated page with page number: "+genPageLink);
@@ -105,8 +111,7 @@ public class Crawler {
 
     }
 
-
-    void getAllLinks(String url){
+   void getAllLinks(String url){
         System.err.println("[-log-]getting all links...");
         LinkedHashSet<String>pageList = new LinkedHashSet<>();
         try {
@@ -115,7 +120,7 @@ public class Crawler {
             for (Element page : linksOnPage) {
                 String link =(page.attr("abs:href"));
                 if(!pageList.contains(link)){
-                   media.start(link);
+                   scraperDriver(link);
                 }
                 pageList.add(link);
             }
@@ -126,6 +131,18 @@ public class Crawler {
 
 
     }
+
+   void scraperDriver(String link){
+        String host = sourceUrl.getHost();
+        if(onlySource && link.contains(host)){
+            mediaScraper.start(link);
+        }else{
+            System.out.println("the links dose not belong to the source URL");
+        }
+        if(!onlySource){
+            mediaScraper.start(link);
+       }
+   }
 
 
 }
