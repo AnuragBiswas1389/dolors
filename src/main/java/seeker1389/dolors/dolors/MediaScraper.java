@@ -15,12 +15,11 @@ import java.net.MalformedURLException;
 import java.net.URL;
 public class MediaScraper {
 
-    private  String url ; //main url for the extraction of required data...
-    private  String link;  // link of the page to be crawled...
-    private URL hostUrl; //host url
-    Db db = new Db(); //class database instance...
-
-    String links[]={}; //stores all the links in the page... used by getLinks method..
+    private  String url ;//main url for the extraction of required data...
+    private  String link;// link of the page to be crawled...
+    private URL hostUrl;//host url
+    Db db = new Db("videodb","video","root","seeker1389");//class database instance...
+    String links[]={};//stores all the links in the page... used by getLinks method..
     int tempid=50;
     MediaScraper(String link){
         if(link!=""){
@@ -40,6 +39,7 @@ public class MediaScraper {
          //default cons.
     }
     int start(String link)  {
+        System.out.printf("\n\n\n");
         System.out.println("[-log-]-----------newLik------------------");
         System.out.println("link- "+link);
         System.err.println("[-log-]Starting scraper!");
@@ -120,10 +120,16 @@ public class MediaScraper {
         }if(absVidType.equalsIgnoreCase(" ")){
             absVidType="htmlPlayer";
         }else{
-            db.starter( new String[]{id, absVidSrc,site,absVidThumb,absVidType});
+            db.starter( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
         }
         tempid++;
     }
+
+    /*
+    This methos scanns
+     all the links
+     iframe links
+     */
     String getWebPlayerLink(Document page){
 
         System.err.println("[-log-]Starting webplayer scraper!");
@@ -132,6 +138,7 @@ public class MediaScraper {
         String players[]={"dood","steamtape"};
         int i=0;
 
+        //processing all the iframe links
         Elements iframe = page.getElementsByTag("iframe");
         if(iframe.isEmpty()){
             System.out.println("---No iframe links found on the link----");
@@ -148,13 +155,25 @@ public class MediaScraper {
                     String site=hostUrl.getHost();
                     String absVidType="webPlayer", absVidThumb = "webPlayer";
 
-                    String data[]={id, webPlayerLink,site,absVidThumb,absVidType};
-                    db.starter(data);
+                    String data[]={webPlayerLink,site,absVidThumb,absVidType};
+                    db.starter("video",data);
                     tempid++;
                 }
 
             }
         }
+
+        //processing all the links on the page...
+        Elements webPlayLinks=page.select("a[href]");
+        for (Element wlink : webPlayLinks) {
+            String lin = (page.attr("abs:href"));
+            for(String player:players){
+                if(lin.contains(player)){
+                    System.out.println("[-log-WebMediaPlayer-]link found: "+lin);
+                }
+            }
+        }
+
 
         return webPlayerLink;
     }
@@ -165,6 +184,7 @@ public class MediaScraper {
         Elements href = page.select("a[href]");
         for(Element hrf : href){
             links[counter]=hrf.attr("abs:href");
+            counter++;
         }
         counter=0;
     }

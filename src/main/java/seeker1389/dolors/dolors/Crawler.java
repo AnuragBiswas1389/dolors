@@ -20,15 +20,19 @@ public class Crawler {
     private String baseUrl;
     private URL sourceUrl;
     boolean onlySource=false;
+    int defaultPageLimit=100;
+    String filterMethod=null;
     public Crawler() {}
-   public Crawler(String url,String mode,boolean onlySource){
+   public Crawler(String url,String mode,boolean onlySource, String filterMethod){
 
        this.onlySource=onlySource;
        this.baseUrl=url; //sets the baseUrl to the starter url...
+       this.filterMethod=filterMethod;//sets the filter method for the object
+
        try {
            sourceUrl=new URL(baseUrl);  //sets the sorceUrl object...
        }catch(Exception e){
-           System.err.println("url malformatted exception occured "+e);
+           System.err.println("url malformed exception occurred "+e);
        }
 
         if(mode.equalsIgnoreCase("sequence")){
@@ -43,8 +47,7 @@ public class Crawler {
         }
     }
 
-
-   public void randomPageNav(String URL) {
+   private void randomPageNav(String URL) {
         //4. Check if you have already crawled the URLs
         //(we are intentionally not checking for duplicate content in this example)
         HashSet<String> links = new HashSet<String>();
@@ -71,7 +74,7 @@ public class Crawler {
         }
     }
 
-   public int[] getPageSequenceInfo(String url){
+   private int[] getPageSequenceInfo(String url){
         Pattern pattern = Pattern.compile("[^a-zA-Z][0-9]+[^a-zA-Z]?");
         Matcher matcher = pattern.matcher(url);
 
@@ -90,17 +93,17 @@ public class Crawler {
         //String target[]=new String[]{url.substring(0,res[1]+1),url.substring(res[2]-1)};
     }
 
-   void sequencePageNav(String baseUrl){
+   private void sequencePageNav(String baseUrl){
 
         String url = baseUrl;
         int res[]=getPageSequenceInfo(baseUrl);
         if(res[0]==-1){
             System.err.println("[-Error-]No page sequence found...");
-            //operations if the page dosenot conains any sequence pages
+            //operations if the page does not contain any sequence pages
         }
         int pageNumber=res[0];
         String pageFrag[]=new String[]{url.substring(0,res[1]+1),url.substring(res[2]-1)};
-        int defaultPageLimit=100;
+
         while(pageNumber<=defaultPageLimit){
             String genPageLink=pageFrag[0]+pageNumber+pageFrag[1];
             System.err.println("[-log-]generated page with page number: "+genPageLink);
@@ -111,7 +114,8 @@ public class Crawler {
 
     }
 
-   void getAllLinks(String url){
+   private void getAllLinks(String url){
+        int counter=0;
         System.err.println("[-log-]getting all links...");
         LinkedHashSet<String>pageList = new LinkedHashSet<>();
         try {
@@ -120,28 +124,66 @@ public class Crawler {
             for (Element page : linksOnPage) {
                 String link =(page.attr("abs:href"));
                 if(!pageList.contains(link)){
-                   scraperDriver(link);
+                    int ind = linksOnPage.size();
+                    System.out.println("["+(ind-counter)+"]"+link);
+                    pageList.add(link);
+                    scraperDriver(link);
+                   counter++;
+                }if(pageList.contains(link)){
+                    System.out.println("link rejected because the link is previously scraped!: ["+link+"]");
                 }
-                pageList.add(link);
+
             }
         }catch (Exception e){
-            System.err.println("[-errCritical-]Url malformatted"+ e);
+            System.err.println("[-errCritical-GetAllLinks-]Url malformatted"+ e);
         }
 
 
 
     }
 
-   void scraperDriver(String link){
-        String host = sourceUrl.getHost();
+   void setDefaultPageLimit(int limit){
+        this.defaultPageLimit=limit;
+   }
+
+
+   private int scraperDriver(String link){
+       String host = sourceUrl.getHost();
+        //setting the length filer method
+       int length=Integer.valueOf(filterMethod);
+
+        //if only source is set to true...
         if(onlySource && link.contains(host)){
+            //procedures for when the filter method is set to something...
+            if(filterMethod!=null) {
+                if ((length > 0) && link.length() >= length) {
+                    mediaScraper.start(link);
+                    return 0;
+                } else {
+                    System.out.println("[-log-]Link rejected because it dose not satisfies the length criteria: "+link);
+                    return -1;
+                }
+            }
             mediaScraper.start(link);
+            return 0;
         }else{
-            System.out.println("the links dose not belong to the source URL");
+            System.out.println("[-log-]Link rejected because the links dose not belong to the source URL");
         }
+
+        //if only source is set to false...
         if(!onlySource){
+            if(filterMethod!=null) {
+                if ((length > 0) && link.length() >= length) {
+                    mediaScraper.start(link);
+                    return 0;
+                } else {
+                    System.out.println("[-log-]Link rejected because it dose not satisfies the length criteria: "+link);
+                    return -1;
+                }
+            }
             mediaScraper.start(link);
        }
+      return 0;
    }
 
 
