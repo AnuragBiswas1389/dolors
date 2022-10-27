@@ -13,14 +13,23 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.LinkedHashSet;
+
 public class MediaScraper {
 
     private  String url ;//main url for the extraction of required data...
     private  String link;// link of the page to be crawled...
     private URL hostUrl;//host url
     Db db = new Db("videodb","video","root","seeker1389");//class database instance...
+
+    ArticleScraper as = new ArticleScraper();
     String links[]={};//stores all the links in the page... used by getLinks method..
     int tempid=50;
+
+    LinkedHashSet<String>linkList= new LinkedHashSet<>();
+
+    String players[]={"dood","streamtape"};
+
     MediaScraper(String link){
         if(link!=""){
             this.link=link;
@@ -39,11 +48,10 @@ public class MediaScraper {
          //default cons.
     }
     int start(String link)  {
-        System.out.printf("\n\n\n");
-        System.out.println("[-log-]-----------newLik------------------");
-        System.out.println("link- "+link);
-        System.err.println("[-log-]Starting scraper!");
 
+        System.out.printf("\n\n");
+        System.out.println("---------------Craper----------------------");
+        System.out.println("link- "+link);
         this.link=link;
         try{
             hostUrl = new URL(link);
@@ -120,22 +128,26 @@ public class MediaScraper {
         }if(absVidType.equalsIgnoreCase(" ")){
             absVidType="htmlPlayer";
         }else{
-            db.starter( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
+            db.executeUpdate( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
         }
         tempid++;
     }
 
-    /*
-    This methos scanns
-     all the links
-     iframe links
-     */
+
+
     String getWebPlayerLink(Document page){
 
         System.err.println("[-log-]Starting webplayer scraper!");
         String frameLink = null;
         String webPlayerLink=null;
-        String players[]={"dood","steamtape"};
+
+        String id=String.valueOf(tempid);
+        String site=hostUrl.getHost();
+        String absVidType="webPlayer", absVidThumb = "webPlayer";
+        String title = as.getTitle(link);
+
+        linkList.clear();
+
         int i=0;
 
         //processing all the iframe links
@@ -145,33 +157,38 @@ public class MediaScraper {
         }
         for(Element ifr : iframe){
             frameLink = ifr.attr("src");
-            System.err.println("iframe link found "+frameLink);
             for(String player :players) {
                 if (frameLink.contains(player)) {
                     webPlayerLink = frameLink;
-                    System.out.println("link found "+webPlayerLink);
-
-                    String id=String.valueOf(tempid);
-                    String site=hostUrl.getHost();
-                    String absVidType="webPlayer", absVidThumb = "webPlayer";
-
-                    String data[]={webPlayerLink,site,absVidThumb,absVidType};
-                    db.starter("video",data);
-                    tempid++;
+                    System.out.println("iframe link found: "+webPlayerLink);
+                    if(!linkList.contains(link)){
+                        linkList.add(webPlayerLink);
+                    }
                 }
 
             }
         }
 
         //processing all the links on the page...
-        Elements webPlayLinks=page.select("a[href]");
-        for (Element wlink : webPlayLinks) {
-            String lin = (page.attr("abs:href"));
-            for(String player:players){
-                if(lin.contains(player)){
-                    System.out.println("[-log-WebMediaPlayer-]link found: "+lin);
+        Elements linksOnPage = page.select("a[href]");
+        for (Element Srcpage : linksOnPage) {
+                String li =(Srcpage.attr("abs:href"));
+                for(String player : players){
+                    if(li.contains(player)){
+                        if(!linkList.contains(li)){
+                            linkList.add(li);
+                        }
+                    }
                 }
-            }
+
+        }
+
+
+
+        for(String srcLink:linkList){
+             String data[]={srcLink,site,absVidThumb,title,absVidType};
+            System.out.println(" final links : "+srcLink);
+            // db.executeUpdate("videoData",data);
         }
 
 

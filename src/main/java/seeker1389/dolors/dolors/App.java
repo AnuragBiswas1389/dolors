@@ -11,7 +11,7 @@ public class App {
         System.out.println("Enter the url");
         String url = input.nextLine();
 
-        Crawler crawler = new Crawler(url,"sequence",true,"45");
+        Crawler crawler = new Crawler(url,"sequence",true,"50");
 
     }
 }
