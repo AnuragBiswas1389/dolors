@@ -120,7 +120,6 @@ public class Crawler {
         this.defaultPageLimit=limit;
    }
 
-
    private int scraperDriver(String link){
        String host = sourceUrl.getHost();
 

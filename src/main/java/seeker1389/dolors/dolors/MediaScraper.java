@@ -23,12 +23,13 @@ public class MediaScraper {
     Db db = new Db("videodb","video","root","seeker1389");//class database instance...
 
     ArticleScraper as = new ArticleScraper();
+
+    FileHandler fh = new FileHandler();
     String links[]={};//stores all the links in the page... used by getLinks method..
-    int tempid=50;
 
     LinkedHashSet<String>linkList= new LinkedHashSet<>();
 
-    String players[]={"dood","streamtape"};
+    String players[]={"dood","streamtape","streamtapeadblockuser","sbanh"};
 
     MediaScraper(String link){
         if(link!=""){
@@ -44,9 +45,8 @@ public class MediaScraper {
         }
 
     }//sets the source url
-    MediaScraper(){
-         //default cons.
-    }
+
+    MediaScraper(){}
     int start(String link)  {
 
         System.out.printf("\n\n");
@@ -119,7 +119,6 @@ public class MediaScraper {
         String absVidSrc=getAbs(vidSrc);
         String absVidThumb=getAbs(vidThumb);
         String absVidType=vidType;
-        String id=String.valueOf(tempid);
         String site=hostUrl.getHost();
 
         if(absVidSrc.equalsIgnoreCase(" ")||absVidThumb.equalsIgnoreCase(" ")){
@@ -128,9 +127,9 @@ public class MediaScraper {
         }if(absVidType.equalsIgnoreCase(" ")){
             absVidType="htmlPlayer";
         }else{
-            db.executeUpdate( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
+           // db.executeUpdate( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
         }
-        tempid++;
+
     }
 
 
@@ -141,7 +140,6 @@ public class MediaScraper {
         String frameLink = null;
         String webPlayerLink=null;
 
-        String id=String.valueOf(tempid);
         String site=hostUrl.getHost();
         String absVidType="webPlayer", absVidThumb = "webPlayer";
         String title = as.getTitle(link);
@@ -182,12 +180,10 @@ public class MediaScraper {
                 }
 
         }
-
-
-
         for(String srcLink:linkList){
              String data[]={srcLink,site,absVidThumb,title,absVidType};
             System.out.println(" final links : "+srcLink);
+            fh.writeUrl("data.txt",data);
             // db.executeUpdate("videoData",data);
         }
 
