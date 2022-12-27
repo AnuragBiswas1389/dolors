@@ -6,7 +6,9 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.net.URL;
-import java.util.LinkedHashSet;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,43 +16,94 @@ import java.util.regex.Pattern;
 public class Crawler {
 
 
-    MediaScraper mediaScraper = new MediaScraper();
+    private MediaScraper mediaScraper=null;
     private String baseUrl;
     private URL sourceUrl;
-    boolean onlySource=false;
-    int defaultPageLimit=100;
-    String filterMethod=null;
+    private boolean onlySource=false;
+    private int defaultPageLimit=200;
+    private String filterMethod=null;
 
-    LinkedHashSet<String> pageList = new LinkedHashSet<>();
+    private int urLength=30;
+    private  String mode="sitemap";
+
+    SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    Date dt = new Date();
+    private String date= formatter.format(dt);
+
+    private Db db=null;
+
+    ArrayList<String> crawlUrls = new ArrayList<String>();
 
     public Crawler() {}
-   public Crawler(String url,String mode,boolean onlySource, String filterMethod){
 
-       this.onlySource=onlySource;
-       this.baseUrl=url; //sets the baseUrl to the starter url...
-       this.filterMethod=filterMethod;//sets the filter method for the object
-
+   public Crawler(String url){
+       this.baseUrl=url;
        try {
-           sourceUrl=new URL(baseUrl);  //sets the sorceUrl object...
+           sourceUrl=new URL(baseUrl);
+           String dbname=sourceUrl.getHost().replace('.','_');
+           db = new Db("root","seeker1389", dbname);
        }catch(Exception e){
            System.err.println("url malformed exception occurred "+e);
        }
+   }
 
-        if(mode.equalsIgnoreCase("sequence")){
-                sequencePageNav(url);
-        }
+    Crawler start(){
 
-        /*
-        executed procedures for the random mode
-         */
-        if(mode.equalsIgnoreCase("random")){
-            randomPageNav(url);
-        }
+       mediaScraper = new MediaScraper();
+
+       if(mode.equalsIgnoreCase("sequence")){
+           sequencePageNav(baseUrl);
+       }
+       if(mode.equalsIgnoreCase("sitemap")){
+           randomPageNav(baseUrl);
+       }
+       if(mode.equalsIgnoreCase("single")){
+           getAllLinks(baseUrl);
+       }else{
+           getAllLinks(baseUrl);
+       }
+        return null;
     }
+
+
+    Crawler scrapSingleSite(){
+        mode="single";
+        return this;
+    }
+
+    Crawler scrapSequentially(){
+        mode="sequence";
+        return this;
+    }
+
+    Crawler setUrLength(int length){
+        this.urLength=length;
+        return this;
+    }
+
+    Crawler pagelimit(int limit){
+        defaultPageLimit=limit;
+        return this;
+    }
+
+    Crawler setUrl(String url){
+        baseUrl=url;
+        return this;
+    }
+
+    Crawler crawlOnlyBaseUrl(){
+        onlySource=true;
+        return this;
+    }
+
+    void setDefaultPageLimit(int limit){
+
+        this.defaultPageLimit=limit;
+    }
+//----------------------------------------------------
 
    private void randomPageNav(String URL) {
     }
-
    private int[] getPageSequenceInfo(String url){
         Pattern pattern = Pattern.compile("[^a-zA-Z][0-9]+[^a-zA-Z]?");
         Matcher matcher = pattern.matcher(url);
@@ -69,6 +122,7 @@ public class Crawler {
         return out;
         //String target[]=new String[]{url.substring(0,res[1]+1),url.substring(res[2]-1)};
     }
+
 
    private void sequencePageNav(String baseUrl){
 
@@ -89,10 +143,12 @@ public class Crawler {
             System.err.println("[-log-]generated page: "+genPageLink);
 
             getAllLinks(genPageLink);
+           // mediaScraper.setPageInfo(sourceUrl.getHost().concat("_Page_")+pageNumber);
             pageNumber++;
         }
 
     }
+
 
    private void getAllLinks(String url){
         int counter=0;
@@ -101,48 +157,81 @@ public class Crawler {
             Document document = Jsoup.connect(url).get();
             Elements linksOnPage = document.select("a[href]");
 
-            for (Element page : linksOnPage) {
-                String link =(page.attr("abs:href"));
-                if(!pageList.contains(link)){
-                    pageList.add(link);
-                    System.err.println("on link "+link);
-                    scraperDriver(link);
+            for (Element lin : linksOnPage) {
+                String link =(lin.attr("abs:href"));
+                if(!db.contains("links","url=".concat("\"")+link.concat("\""))){
+                    System.err.println("link added: "+link);
+                    filter(lin,link);
+                }else{
+                    System.err.println("[log]link Exist");
                 }
-
-
             }
         }catch (Exception e){
             System.err.println("[-errCritical-GetAllLinks-] "+ e);
         }
    }
 
-   void setDefaultPageLimit(int limit){
-        this.defaultPageLimit=limit;
-   }
 
-   private int scraperDriver(String link){
+    private String getThumbnailData(Element link){
+        Elements thumb = link.select("a>img");
+        String thumbnailUrl= thumb.attr("src");
+        //System.out.println("_________________________thumbnail data: "+thumbnailUrl);
+        //mediaScraper.setThumbnailData(thumbnailUrl);
+        return thumbnailUrl;
+    }
+
+
+   private void filter(Element linkElement,String link){
+        String filteredLink=null;
        String host = sourceUrl.getHost();
+       String thumbUrl;
 
-       int length=Integer.valueOf(filterMethod);
+       if(link.contains(host)){
+           filteredLink=link;
+       }
+       if(link.length()>urLength){
+           filteredLink=link;
+       }
 
-        if(onlySource && link.contains(host)){
-            if(filterMethod!=null) {
-                if ((length > 0) && link.length() >= length) {
-                    mediaScraper.start(link);
-                    return 0;
-                } else {
-                    return -1;
-                }
-            }
-            System.out.println("[debug]sending without filtration");
-            mediaScraper.start(link);
-            return 0;
-        }else{
-            System.out.println("[-log-]Link rejected because the links dose not belong to the source URL");
-        }
+       if(filteredLink!=null){
+           thumbUrl=getThumbnailData(linkElement);
+           String type="media";
+           String scraped="false";
+           String crawled="false";
+           String data="null";
+            String res[]={link,type,date,data,scraped,crawled};
+            db.executeUpdate("links",res);
+       }else{
+          System.out.println("link rejected because it failed filteration : "+link);
+       }
 
-      return 0;
+
    }
+
+
+    public void fetchUrl(){
+        crawlUrls=db.fetchLinks("50");
+        //============================================
+       String upd="update links set crawl =\"true\" where id=";
+        for(int i=0; i<crawlUrls.size(); i++){
+            String[] rec =crawlUrls.get(i).split("#");
+            for(int x=0; x<2; x++){
+                System.out.println(rec[x]);
+                int r=db.update(upd.concat(rec[0]).concat(";"));
+                if(r>0){System.out.println("updated success!");}
+            }
+        }
+        //===================================================
+
+    }
+
+    //gets the link as crawled..
+//    private void getCrawled(String link){
+//
+//    }
+
+
+
 
 
 }

@@ -6,35 +6,31 @@ import java.io.IOException;
 
 public class FileHandler {
 
-    FileHandler(){
-        createFile();
-    }
-    File file=null;
-    private void createFile(){
+
+
+
+    private String createFile(String fileName){
             try{
-                 file = new File("data.txt");
+                File file = new File(fileName);
             }catch(Exception e){
                 System.err.println(e);
             }
-
+            return fileName;
     }
 
-    void writeUrl(String filename ,String []data) {
-
-        String text = data[0].concat("\n");
-        FileWriter fw = null;
+    void writeData(String fileName ,String []data) {
+        if(fileName.length()>25) fileName = fileName.substring(0, 25).concat("...");
         try {
-            fw = new FileWriter("data.txt", true);
-            fw.write(text);
+            FileWriter fw = new FileWriter("output/"+fileName,true);
+            for(String str:data){
+                fw.write(str.concat("\n"));
+            }
             fw.close();
-            System.out.println("file written successfully");
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
     }
-
-
 
 
 }

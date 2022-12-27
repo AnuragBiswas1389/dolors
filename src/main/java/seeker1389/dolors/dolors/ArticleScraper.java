@@ -15,9 +15,7 @@ public class ArticleScraper {
     public String getTitle(String link){
         getPage(link);
         String heading = null;
-
         heading=page.title();
-
         return heading;
     }
 

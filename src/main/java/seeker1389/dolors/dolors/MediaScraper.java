@@ -15,21 +15,39 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.LinkedHashSet;
 
+
+
+
 public class MediaScraper {
+
+    private String output="database";
 
     private  String url ;//main url for the extraction of required data...
     private  String link;// link of the page to be crawled...
     private URL hostUrl;//host url
-    Db db = new Db("videodb","video","root","seeker1389");//class database instance...
 
-    ArticleScraper as = new ArticleScraper();
+    private String absVidThumb="notFound";// video thumbnail url
 
-    FileHandler fh = new FileHandler();
-    String links[]={};//stores all the links in the page... used by getLinks method..
+    private boolean allowLoggingToSinglePg=false;
 
-    LinkedHashSet<String>linkList= new LinkedHashSet<>();
+   // private Db db = new Db("videodb","video","root","seeker1389");//class database instance...
 
-    String players[]={"dood","streamtape","streamtapeadblockuser","sbanh"};
+    private ArticleScraper as = new ArticleScraper();
+
+    private  FileHandler fh = new FileHandler();
+
+
+    private String links[]={};//stores all the links in the page... used by getLinks method..
+
+    private LinkedHashSet<String>linkList= new LinkedHashSet<>();
+
+    private String players[]={"dood","streamtape","streamtapeadblockuser","sbanh","vtube"};
+    private String blockedPlayers[]={"tsyndicate"};
+
+    private String pageInfo=null;
+
+
+
 
     MediaScraper(String link){
         if(link!=""){
@@ -47,43 +65,45 @@ public class MediaScraper {
     }//sets the source url
 
     MediaScraper(){}
+
     int start(String link)  {
 
         System.out.printf("\n\n");
-        System.out.println("---------------Craper----------------------");
+        System.out.println("---------------Scraper----------------------");
         System.out.println("link- "+link);
         this.link=link;
         try{
             hostUrl = new URL(link);
+            pageInfo=as.getTitle(link);
         }catch (Exception e){
-            System.err.println("[-errCritical-]URL is malformatted, cannot create url object! ");
+            System.err.println("[-errCritical-]URL is malformed, cannot create url object! ");
         }
        Document page = getPage();
 //     getElements(page);   temporaryly
        getWebPlayerLink(page);
        return 0;
     }
-    boolean checkUrl(String url) throws AppException {
-       if(url.matches(" ")){                    // ------add regex here-------
-           return true;
-       }else{
-           throw new AppException(400);
-       }
-    }
-    Document getPage(){
+
+    private Document getPage(){
         try {
             Document page = Jsoup.connect(link)
                     .userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6")
                     .referrer("http://www.google.com")
                     .get();
-            System.err.println("[-log-]Downloded target page successfully!");
+            System.err.println("[-log-]Downloaded target page successfully!");
             return page;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
 
     }
-    String getAbs(String link){
+
+    MediaScraper setOutput(String output){
+        this.output=output;
+        return this;
+    }
+
+    private String getAbs(String link){
          String absLink=link;
         if(!(link.contains("https://")||link.contains("http://"))){
             System.err.println("The link is not absolute... providing the absolute link..");
@@ -98,6 +118,7 @@ public class MediaScraper {
         }
         return absLink;
     }
+
     void getElements(Document page){
          String vidSrc="not found", vidThumb="not found", vidType="not found";
 
@@ -132,7 +153,11 @@ public class MediaScraper {
 
     }
 
+    void setPageInfo(String data){
+        this.pageInfo=data;
+    }
 
+    //used to contorl the creation of a single file for scraping single page
 
     String getWebPlayerLink(Document page){
 
@@ -141,12 +166,11 @@ public class MediaScraper {
         String webPlayerLink=null;
 
         String site=hostUrl.getHost();
-        String absVidType="webPlayer", absVidThumb = "webPlayer";
+        String absVidType="webPlayer";
         String title = as.getTitle(link);
-
+        String srcLink="";
         linkList.clear();
 
-        int i=0;
 
         //processing all the iframe links
         Elements iframe = page.getElementsByTag("iframe");
@@ -155,12 +179,22 @@ public class MediaScraper {
         }
         for(Element ifr : iframe){
             frameLink = ifr.attr("src");
-            for(String player :players) {
-                if (frameLink.contains(player)) {
+            for(String player :players){
+                if (frameLink.contains(player)){
                     webPlayerLink = frameLink;
                     System.out.println("iframe link found: "+webPlayerLink);
                     if(!linkList.contains(link)){
                         linkList.add(webPlayerLink);
+                    }
+                }
+            }
+            if(frameLink.startsWith("/")){
+                String absLink="https://"+hostUrl.getHost().concat(frameLink);
+                for (String blkPlayers:blockedPlayers){
+                    if(!absLink.contains(blkPlayers)){
+                        if(!linkList.contains(absLink)){
+                            linkList.add(absLink);
+                        }
                     }
                 }
 
@@ -174,24 +208,47 @@ public class MediaScraper {
                 for(String player : players){
                     if(li.contains(player)){
                         if(!linkList.contains(li)){
+                            System.out.println("On page link :"+li);
                             linkList.add(li);
                         }
                     }
                 }
 
         }
-        for(String srcLink:linkList){
-             String data[]={srcLink,site,absVidThumb,title,absVidType};
-            System.out.println(" final links : "+srcLink);
-            fh.writeUrl("data.txt",data);
-            // db.executeUpdate("videoData",data);
+        String data[]={srcLink,site,absVidThumb,title,absVidType};
+
+        if(output.equalsIgnoreCase("text")){
+            if(allowLoggingToSinglePg){
+            if(!linkList.isEmpty()){
+                fh.writeData(hostUrl.getHost().concat(".txt"),new String[]{"$title$"+title,"$thumb$"+absVidThumb});
+            }
+        }if(!allowLoggingToSinglePg){
+            if(!linkList.isEmpty()){
+                fh.writeData(pageInfo.concat(".txt"),new String[]{"$title$"+title});
+            }
+        }
         }
 
 
+        for(String finalLink:linkList){
+             srcLink=finalLink;
+            System.out.println(" final links : "+srcLink);
+
+            if(allowLoggingToSinglePg){
+                fh.writeData(hostUrl.getHost().concat(".txt"),new String[]{srcLink});
+            }if(!allowLoggingToSinglePg){
+                fh.writeData(pageInfo.concat(".txt"),new String[]{srcLink});
+            }
+
+            // db.executeUpdate("videoData",data);
+        }
         return webPlayerLink;
     }
 
-    void getLinks(){
+
+
+
+   private void getLinks(){
         int counter=0;
         Document page = getPage();
         Elements href = page.select("a[href]");
@@ -200,8 +257,15 @@ public class MediaScraper {
             counter++;
         }
         counter=0;
-    }
+   }
 
+   Crawler setSingleOutput(){
+        allowLoggingToSinglePg=true;
+       return null;
+   }
 
+   void setThumbnailData(String url){
+        this.absVidThumb=url;
+   }
 
 }
