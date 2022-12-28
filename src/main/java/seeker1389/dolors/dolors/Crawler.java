@@ -23,9 +23,11 @@ import java.util.regex.Pattern;
 *   sets the limit of the url length for filteration of the url
 * 4. crawlOnlyBaseUrl()
 *   limits the crawling to the base url only
-* 5. scrapSinglePage()
-*   Limits the scraping to only the single page of the url provided
-* 6. scrapSequentially()
+* 5. crawlSinglePage()
+*   Limits the crawling to only the single page of the url provided
+* 6. crawlSequentially()
+*   Crawls the site by following a page sequence
+* 
 *
 *  */
 public class Crawler {
@@ -53,12 +55,12 @@ public class Crawler {
 
 
 //-------------------------------[Object Modifier methods]----------------------------------------
-    Crawler scrapSinglePage(){
+    Crawler crawlSinglePage(){
         mode="single";
         return this;
     }
 
-    Crawler scrapSequentially(){
+    Crawler crawlSequentially(){
         mode="sequence";
         return this;
     }
@@ -83,9 +85,6 @@ public class Crawler {
         return this;
     }
 
-    void setDefaultPageLimit(int limit){
-        this.defaultPageLimit=limit;
-    }
 //----------------------------------------------------
     public Crawler() {}
 
@@ -152,7 +151,6 @@ public class Crawler {
             System.err.println("[-log-]generated page: "+genPageLink);
 
             getAllLinks(genPageLink);
-           // mediaScraper.setPageInfo(sourceUrl.getHost().concat("_Page_")+pageNumber);
             pageNumber++;
         }
 
@@ -189,7 +187,7 @@ public class Crawler {
         Elements thumb = link.select("a>img");
         String thumbnailUrl= thumb.attr("src");
         //System.out.println("_________________________thumbnail data: "+thumbnailUrl);
-        //mediaScraper.setThumbnailData(thumbnailUrl);
+        //mediacrawler.setThumbnailData(thumbnailUrl);
         return thumbnailUrl;
     }
 
