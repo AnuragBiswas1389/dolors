@@ -5,6 +5,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -12,19 +13,34 @@ import java.util.Date;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-
+/*
+*Methods of the crawler class---
+* 1. setUrl(String)
+*   sets the base url
+* 2. setPageLimit(int)
+*   sets the page limit to be crawled sequentially
+* 3. setUrlenth(int)
+*   sets the limit of the url length for filteration of the url
+* 4. crawlOnlyBaseUrl()
+*   limits the crawling to the base url only
+* 5. scrapSinglePage()
+*   Limits the scraping to only the single page of the url provided
+* 6. scrapSequentially()
+*
+*  */
 public class Crawler {
 
 
-    private MediaScraper mediaScraper=null;
+
     private String baseUrl;
     private URL sourceUrl;
     private boolean onlySource=false;
     private int defaultPageLimit=200;
+
     private String filterMethod=null;
 
     private int urLength=30;
-    private  String mode="sitemap";
+   private  String mode="sitemap";
 
     SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
     Date dt = new Date();
@@ -34,39 +50,10 @@ public class Crawler {
 
     ArrayList<String> crawlUrls = new ArrayList<String>();
 
-    public Crawler() {}
-
-   public Crawler(String url){
-       this.baseUrl=url;
-       try {
-           sourceUrl=new URL(baseUrl);
-           String dbname=sourceUrl.getHost().replace('.','_');
-           db = new Db("root","seeker1389", dbname);
-       }catch(Exception e){
-           System.err.println("url malformed exception occurred "+e);
-       }
-   }
-
-    Crawler start(){
-
-       mediaScraper = new MediaScraper();
-
-       if(mode.equalsIgnoreCase("sequence")){
-           sequencePageNav(baseUrl);
-       }
-       if(mode.equalsIgnoreCase("sitemap")){
-           randomPageNav(baseUrl);
-       }
-       if(mode.equalsIgnoreCase("single")){
-           getAllLinks(baseUrl);
-       }else{
-           getAllLinks(baseUrl);
-       }
-        return null;
-    }
 
 
-    Crawler scrapSingleSite(){
+//-------------------------------[Object Modifier methods]----------------------------------------
+    Crawler scrapSinglePage(){
         mode="single";
         return this;
     }
@@ -97,13 +84,35 @@ public class Crawler {
     }
 
     void setDefaultPageLimit(int limit){
-
         this.defaultPageLimit=limit;
     }
 //----------------------------------------------------
+    public Crawler() {}
 
-   private void randomPageNav(String URL) {
+    public Crawler(String url){
+        this.baseUrl=url;
+        try {
+            sourceUrl=new URL(baseUrl);
+            String dbname=sourceUrl.getHost().replace('.','_');
+            db = new Db("root","seeker1389", dbname);
+        }catch(Exception e){
+            System.err.println("url malformed exception occurred "+e);
+        }
     }
+
+    Crawler start(){
+        if(mode.equalsIgnoreCase("sequence")){
+            sequencePageNav(baseUrl);
+        }
+        if(mode.equalsIgnoreCase("sitemap")){
+            getAllLinks(baseUrl);
+        }
+        if(mode.equalsIgnoreCase("single")){
+            getAllLinks(baseUrl);
+        }
+        return null;
+    }
+
    private int[] getPageSequenceInfo(String url){
         Pattern pattern = Pattern.compile("[^a-zA-Z][0-9]+[^a-zA-Z]?");
         Matcher matcher = pattern.matcher(url);
@@ -160,12 +169,16 @@ public class Crawler {
             for (Element lin : linksOnPage) {
                 String link =(lin.attr("abs:href"));
                 if(!db.contains("links","url=".concat("\"")+link.concat("\""))){
-                    System.err.println("link added: "+link);
                     filter(lin,link);
                 }else{
                     System.err.println("[log]link Exist");
                 }
             }
+            //used for fetching the uncrawled links for further link indexing
+            if(mode.equalsIgnoreCase("sitemap")){
+                fetchUrl();
+            }
+
         }catch (Exception e){
             System.err.println("[-errCritical-GetAllLinks-] "+ e);
         }
@@ -183,14 +196,25 @@ public class Crawler {
 
    private void filter(Element linkElement,String link){
         String filteredLink=null;
-       String host = sourceUrl.getHost();
-       String thumbUrl;
 
-       if(link.contains(host)){
-           filteredLink=link;
-       }
+       String thumbUrl;
        if(link.length()>urLength){
            filteredLink=link;
+       }
+       if (onlySource) {
+           try {
+               String host = sourceUrl.getHost();
+               URL trgtLink = new URL(link);
+               if (trgtLink.getHost().equalsIgnoreCase(host)) {
+                   filteredLink = link;
+               }else{
+                   filteredLink=null;
+                   //System.out.println("link regected because dosenot beling to src");
+               }
+           } catch (MalformedURLException e) {
+               throw new RuntimeException(e);
+           }
+
        }
 
        if(filteredLink!=null){
@@ -201,7 +225,9 @@ public class Crawler {
            String data="null";
             String res[]={link,type,date,data,scraped,crawled};
             db.executeUpdate("links",res);
+            System.out.println("Link added to queue "+link);
        }else{
+
           System.out.println("link rejected because it failed filteration : "+link);
        }
 
@@ -211,6 +237,7 @@ public class Crawler {
 
     public void fetchUrl(){
         crawlUrls=db.fetchLinks("50");
+        System.err.println("fetching uncrawled links-------");
         //============================================
        String upd="update links set crawl =\"true\" where id=";
         for(int i=0; i<crawlUrls.size(); i++){
@@ -219,9 +246,15 @@ public class Crawler {
                 System.out.println(rec[x]);
                 int r=db.update(upd.concat(rec[0]).concat(";"));
                 if(r>0){System.out.println("updated success!");}
+                //calling the link indexer for all links----
+                getAllLinks(rec[1]);
             }
         }
         //===================================================
+
+    }
+
+    private void printr(String message, String type){
 
     }
 

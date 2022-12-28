@@ -7,9 +7,8 @@ public class App {
 
        // Scanner input = new Scanner(System.in);
         String url = "https://aagmaal.life/page/2/";
-        //Crawler crawler = new Crawler(url).scrapSequentially() .pagelimit(500).setUrLength(0).crawlOnlyBaseUrl();
-        Crawler cr = new Crawler(url);
-        cr.fetchUrl();
+        Crawler crawler = new Crawler(url).pagelimit(500).setUrLength(0).crawlOnlyBaseUrl().start();
+
 
     }
 }
