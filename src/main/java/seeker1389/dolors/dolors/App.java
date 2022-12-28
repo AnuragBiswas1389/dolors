@@ -7,7 +7,7 @@ public class App {
 
        // Scanner input = new Scanner(System.in);
         String url = "https://aagmaal.life/page/2/";
-        Crawler crawler = new Crawler(url).pagelimit(500).setUrLength(0).crawlOnlyBaseUrl().start();
+        Crawler crawler = new Crawler(url).pagelimit(500).setUrLength(0).crawlOnlyBaseUrl().setLoggingOff().start();
 
 
     }

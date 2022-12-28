@@ -27,7 +27,8 @@ import java.util.regex.Pattern;
 *   Limits the crawling to only the single page of the url provided
 * 6. crawlSequentially()
 *   Crawls the site by following a page sequence
-* 
+*  7. setLoggingOff()
+*   sets the logging off (by default its ON)
 *
 *  */
 public class Crawler {
@@ -40,6 +41,8 @@ public class Crawler {
     private int defaultPageLimit=200;
 
     private String filterMethod=null;
+
+    private boolean logging = true;
 
     private int urLength=30;
    private  String mode="sitemap";
@@ -77,6 +80,11 @@ public class Crawler {
 
     Crawler setUrl(String url){
         baseUrl=url;
+        return this;
+    }
+
+    Crawler setLoggingOff(){
+        this.logging=false;
         return this;
     }
 
@@ -186,7 +194,7 @@ public class Crawler {
     private String getThumbnailData(Element link){
         Elements thumb = link.select("a>img");
         String thumbnailUrl= thumb.attr("src");
-        //System.out.println("_________________________thumbnail data: "+thumbnailUrl);
+        //printr("thumbDataExtractor","_________________________thumbnail data: "+thumbnailUrl","message");
         //mediacrawler.setThumbnailData(thumbnailUrl);
         return thumbnailUrl;
     }
@@ -207,7 +215,6 @@ public class Crawler {
                    filteredLink = link;
                }else{
                    filteredLink=null;
-                   //System.out.println("link regected because dosenot beling to src");
                }
            } catch (MalformedURLException e) {
                throw new RuntimeException(e);
@@ -217,16 +224,18 @@ public class Crawler {
 
        if(filteredLink!=null){
            thumbUrl=getThumbnailData(linkElement);
+           //========================================adding link to database here==============================
            String type="media";
            String scraped="false";
            String crawled="false";
            String data="null";
             String res[]={link,type,date,data,scraped,crawled};
             db.executeUpdate("links",res);
-            System.out.println("Link added to queue "+link);
+            printr("filter","Link added to queue "+link,"message");
+            //===============================================end=================================================
        }else{
 
-          System.out.println("link rejected because it failed filteration : "+link);
+          printr("filter","link rejected because it failed filteration : "+link,"log");
        }
 
 
@@ -241,9 +250,8 @@ public class Crawler {
         for(int i=0; i<crawlUrls.size(); i++){
             String[] rec =crawlUrls.get(i).split("#");
             for(int x=0; x<2; x++){
-                System.out.println(rec[x]);
                 int r=db.update(upd.concat(rec[0]).concat(";"));
-                if(r>0){System.out.println("updated success!");}
+                if(r>0){printr("fetchURL","updated success!","log");}
                 //calling the link indexer for all links----
                 getAllLinks(rec[1]);
             }
@@ -252,14 +260,27 @@ public class Crawler {
 
     }
 
-    private void printr(String message, String type){
+    private void printr(String source,String message, String type){
+        if(logging==false){
+            return;
+        }
+        String text = "{"+type+"}[-"+source+"-] :"+message;
+
+        if(type.equalsIgnoreCase("message")){
+            System.out.println(text);
+        } if(type.equalsIgnoreCase("warning")|| type.equalsIgnoreCase("log")){
+            System.err.println(text);
+        }
 
     }
-
-    //gets the link as crawled..
-//    private void getCrawled(String link){
-//
-//    }
+    private void printr(String source,String message){
+        if(logging==false){
+            return;
+        }
+        String text = "["+source+"-] :"+message;
+        System.out.println(text);
+    }
+    
 
 
 
