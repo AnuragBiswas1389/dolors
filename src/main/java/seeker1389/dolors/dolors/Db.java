@@ -5,23 +5,30 @@ import java.util.ArrayList;
 
 public class Db {
 
-   private String userName="root",password="root",dbName="videodb", tableName="video";
+   private String userName="root",password="root", dburl= "jdbc:mysql://localhost:3306/";;
     Connection con;
     ResultSet rs;
     boolean dbExitst=false;
-    String siteName;
-    Db( String userName, String password,String siteName){
-        this.dbName=dbName;
-        this.tableName=tableName;
+    String dbName;
+    Db( String userName, String password,String dbName){
          this.password=password;
         this.userName=userName;
-        this.siteName=siteName;
-        System.out.println("[-log-]Db connection created for db: "+dbName);
+        this.dbName=dbName;
+        System.out.println("[-log-]Db connection created");
+        DBdriver();//starting the database and obtaining the connection obj.
+    }
+
+    Db( String userName, String password,String dbName,String url){
+        this.password=password;
+        this.userName=userName;
+        this.dbName=dbName;
+        this.dburl=url;
+        System.out.println("[-log-]Db connection created");
         DBdriver();//starting the database and obtaining the connection obj.
     }
 
    private void DBdriver(){
-        String dburl= "jdbc:mysql://localhost:3306/";
+
         try {
             Class.forName("oracle.jdbc.driver.OracleDriver");
             con = (Connection) DriverManager.getConnection(dburl, this.userName, this.password);
@@ -29,10 +36,10 @@ public class Db {
 
             while (rs.next()){
                 //System.out.println(rs.getString(1));
-                if(rs.getString(1).equalsIgnoreCase(siteName)){
+                if(rs.getString(1).equalsIgnoreCase(dbName)){
                    dbExitst=true;
                    Statement st = con.createStatement();
-                   st.executeUpdate("use "+siteName);
+                   st.executeUpdate("use "+dbName);
 
                 }
             }
@@ -52,10 +59,10 @@ public class Db {
            return;
        }
        try {
-           System.out.println("trying to create database "+siteName);
+           System.out.println("trying to create database "+dbName);
            Statement stat = con.createStatement();
-           stat.executeUpdate("create database "+siteName+";");
-           stat.executeUpdate("use "+siteName);
+           stat.executeUpdate("create database "+dbName+";");
+           stat.executeUpdate("use "+dbName);
            createTable("links");
            System.out.println("database created!");
        } catch (SQLException e) {
@@ -138,10 +145,10 @@ public class Db {
         }
     }
 
-    public ArrayList<String> fetchLinks(String limit){
+    public ArrayList<String> fetchLinks(String limit,String type){
         ArrayList<String> urls = new ArrayList<String>();
         String url,id, res;
-        String sql ="select * from links where crawl = \"false\" limit "+limit+";";//=========================
+        String sql ="select * from links where " +type+ " = \"false\" limit "+limit+";";//=========================
         try {
             Statement st = con.createStatement();
             ResultSet rs = st.executeQuery(sql);

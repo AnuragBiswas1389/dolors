@@ -29,9 +29,10 @@ import java.util.regex.Pattern;
 *   Crawls the site by following a page sequence
 *  7. setLoggingOff()
 *   sets the logging off (by default its ON)
-*
+*  8. enableThumbnailExtractor()
+*   enables the thumbnail extractor and stores the url in the data field
 *  */
-public class Crawler {
+public class Crawler implements Runnable{
 
 
 
@@ -45,15 +46,17 @@ public class Crawler {
     private boolean logging = true;
 
     private int urLength=30;
-   private  String mode="sitemap";
+    private  String mode="sitemap";
 
-    SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
-    Date dt = new Date();
+    private  boolean enableThumbExtractor = false;
+
+    private SimpleDateFormat formatter = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+    private Date dt = new Date();
     private String date= formatter.format(dt);
 
     private Db db=null;
 
-    ArrayList<String> crawlUrls = new ArrayList<String>();
+    private ArrayList<String> crawlUrls = new ArrayList<String>();
 
 
 
@@ -93,7 +96,23 @@ public class Crawler {
         return this;
     }
 
-//----------------------------------------------------
+    Crawler enableThumbnailExtractor(){
+        this.enableThumbExtractor=true;
+        return this;
+    }
+
+    Crawler configDatabase(String userName, String password, String siteName){
+        try {
+            String dbname=sourceUrl.getHost().replace('.','_');
+            db = new Db(userName,password, dbname);
+        }catch(Exception e){
+            System.err.println("unable to create db connection: "+e);
+        }
+        return this;
+    }
+
+
+//---------------------------------------------------------------------
     public Crawler() {}
 
     public Crawler(String url){
@@ -107,6 +126,21 @@ public class Crawler {
         }
     }
 
+    public Crawler(String url, Db db){
+        this.baseUrl=url;
+        this.db=db;
+        try {
+            sourceUrl=new URL(baseUrl);
+
+        }catch(Exception e){
+            System.err.println("url malformed exception occurred "+e);
+        }
+    }
+
+
+    public void run(){
+        start();
+    }
     Crawler start(){
         if(mode.equalsIgnoreCase("sequence")){
             sequencePageNav(baseUrl);
@@ -155,10 +189,11 @@ public class Crawler {
             String genPageLink=pageFrag[0]+pageNumber+pageFrag[1];
 
             System.out.printf("\n\n\n");
-            System.err.printf("---------------------------[Crawler]---------------------------\n");
-            System.err.println("[-log-]generated page: "+genPageLink);
+            System.err.printf("---------------------------[--sequence page Crawler--]---------------------------\n");
+            System.out.println("[-log-]generated page: "+genPageLink);
 
             getAllLinks(genPageLink);
+
             pageNumber++;
         }
 
@@ -167,7 +202,7 @@ public class Crawler {
 
    private void getAllLinks(String url){
         int counter=0;
-        System.err.println("[-log-]getting all links...");
+        System.out.println("[-log-] scanning all links... ");
         try {
             Document document = Jsoup.connect(url).get();
             Elements linksOnPage = document.select("a[href]");
@@ -177,7 +212,7 @@ public class Crawler {
                 if(!db.contains("links","url=".concat("\"")+link.concat("\""))){
                     filter(lin,link);
                 }else{
-                    System.err.println("[log]link Exist");
+                   // System.err.println("[log]link Exist");
                 }
             }
             //used for fetching the uncrawled links for further link indexing
@@ -186,7 +221,7 @@ public class Crawler {
             }
 
         }catch (Exception e){
-            System.err.println("[-errCritical-GetAllLinks-] "+ e);
+            System.err.println("[-errCritical-GetAllLinks-] link: "+url+" "+ e);
         }
    }
 
@@ -194,8 +229,7 @@ public class Crawler {
     private String getThumbnailData(Element link){
         Elements thumb = link.select("a>img");
         String thumbnailUrl= thumb.attr("src");
-        //printr("thumbDataExtractor","_________________________thumbnail data: "+thumbnailUrl","message");
-        //mediacrawler.setThumbnailData(thumbnailUrl);
+        printr("thumbDataExtractor","_________________________thumbnail data: "+thumbnailUrl,"message");
         return thumbnailUrl;
     }
 
@@ -203,7 +237,9 @@ public class Crawler {
    private void filter(Element linkElement,String link){
         String filteredLink=null;
 
-       String thumbUrl;
+        System.out.println(Thread.currentThread().getName());
+
+       String thumbUrl="";
        if(link.length()>urLength){
            filteredLink=link;
        }
@@ -217,24 +253,35 @@ public class Crawler {
                    filteredLink=null;
                }
            } catch (MalformedURLException e) {
+               System.err.println("[-filter-]link error "+link);
                throw new RuntimeException(e);
+
            }
 
        }
 
        if(filteredLink!=null){
-           thumbUrl=getThumbnailData(linkElement);
-           //========================================adding link to database here==============================
+
+           //========================================[adding link to database here]==============================
            String type="media";
            String scraped="false";
            String crawled="false";
            String data="null";
+
+           if(enableThumbExtractor){
+               thumbUrl=getThumbnailData(linkElement);
+               if(!(thumbUrl.equalsIgnoreCase(""))){
+                   data="thumbnail#"+thumbUrl;
+               }else{
+                   System.err.println("thumbnail not found for the link : "+link);
+               }
+
+           }
             String res[]={link,type,date,data,scraped,crawled};
             db.executeUpdate("links",res);
-            printr("filter","Link added to queue "+link,"message");
-            //===============================================end=================================================
+            System.out.println("Link added to Database: "+link);
+            //===============================================[end]=================================================
        }else{
-
           printr("filter","link rejected because it failed filteration : "+link,"log");
        }
 
@@ -242,8 +289,8 @@ public class Crawler {
    }
 
 
-    public void fetchUrl(){
-        crawlUrls=db.fetchLinks("50");
+    private void fetchUrl(){
+        crawlUrls=db.fetchLinks("50", "crawl");
         System.err.println("fetching uncrawled links-------");
         //============================================
        String upd="update links set crawl =\"true\" where id=";
@@ -261,7 +308,7 @@ public class Crawler {
     }
 
     private void printr(String source,String message, String type){
-        if(logging==false){
+        if(!logging){
             return;
         }
         String text = "{"+type+"}[-"+source+"-] :"+message;
@@ -280,7 +327,7 @@ public class Crawler {
         String text = "["+source+"-] :"+message;
         System.out.println(text);
     }
-    
+
 
 
 

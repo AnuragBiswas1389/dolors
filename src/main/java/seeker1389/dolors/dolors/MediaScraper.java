@@ -13,12 +13,13 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 
 
 
 
-public class MediaScraper {
+public class MediaScraper implements Runnable {
 
     private String output="database";
 
@@ -30,7 +31,7 @@ public class MediaScraper {
 
     private boolean allowLoggingToSinglePg=false;
 
-   // private Db db = new Db("videodb","video","root","seeker1389");//class database instance...
+    private Db db = new Db("root","seeker1389","aagmaal_life");//class database instance...
 
     private ArticleScraper as = new ArticleScraper();
 
@@ -46,27 +47,39 @@ public class MediaScraper {
 
     private String pageInfo=null;
 
+    private ArrayList<String> scrapUrls = new ArrayList<String>();
+
+
+//----------------------------------------------------
+
+    @Override
+    public  void run(){
+        fetchUrl();
+    }
 
 
 
-    MediaScraper(String link){
-        if(link!=""){
-            this.link=link;
-             hostUrl = null;
-            try {
-                hostUrl = new URL(link);
-            } catch (MalformedURLException e) {
-                System.err.println("url format error");
-                System.err.println("cannot set link because link found is empty..");
-                throw new RuntimeException(e);
+    private void fetchUrl(){
+        scrapUrls=db.fetchLinks("50","scrap");
+        System.err.println("fetching unscraped links-------");
+        //============================================
+        String upd="update links set scrap =\"true\" where id=";
+        for(int i=0; i<scrapUrls.size(); i++){
+            String[] rec =scrapUrls.get(i).split("#");
+            for(int x=0; x<2; x++){
+                int r=db.update(upd.concat(rec[0]).concat(";"));
+                System.out.println(rec[1]+"from "+Thread.currentThread().getName());
+                if(r>0){
+                    System.out.println("updated success!");
+                }
+                //calling the link indexer for all links----
+
             }
         }
+        //===================================================
 
-    }//sets the source url
-
-    MediaScraper(){}
-
-    int start(String link)  {
+    }
+    int start()  {
 
         System.out.printf("\n\n");
         System.out.println("---------------Scraper----------------------");
