@@ -22,19 +22,26 @@ import java.util.LinkedHashSet;
 public class MediaScraper implements Runnable {
 
     private String output="database";
+    private boolean logging=true;//member for logging method
 
-    private  String url ;//main url for the extraction of required data...
     private  String link;// link of the page to be crawled...
-    private URL hostUrl;//host url
+    private URL hostUrl;//mai urlObject initialized on startup url
 
+
+    private Db scraperDb;//db object for scraper
+    private Db siteDb; // db of the target site
+
+
+    private Document page=null; //Target page of the current scraper instance
     private String absVidThumb="notFound";// video thumbnail url
+    private  String type ="undefined";//type of the source url
+    private String pageTitle="undefined"; //page title of the current page
+
+
 
     private boolean allowLoggingToSinglePg=false;
 
-    private Db db = new Db("root","seeker1389","aagmaal_life");//class database instance...
-
     private ArticleScraper as = new ArticleScraper();
-
     private  FileHandler fh = new FileHandler();
 
 
@@ -45,49 +52,77 @@ public class MediaScraper implements Runnable {
     private String players[]={"dood","streamtape","streamtapeadblockuser","sbanh","vtube"};
     private String blockedPlayers[]={"tsyndicate"};
 
-    private String pageInfo=null;
+
 
     private ArrayList<String> scrapUrls = new ArrayList<String>();
 
 
-//----------------------------------------------------
+//===================================[object config]=================
+    MediaScraper(Db db){
+        this.siteDb=db;
+    }
+    MediaScraper(Db db,Db scraperDb){
+        this.siteDb=db;
+        this.scraperDb=scraperDb;
+    }
+    MediaScraper setOutput(String output){
+        this.output=output;
+        return this;
+    }
 
+    Crawler setSingleOutput(){
+        allowLoggingToSinglePg=true;
+        return null;
+    }
+    Crawler enableLogging(){
+        this.logging=true;
+        return null;
+    }
+
+  
+//===================================================================
+
+    //entry point of the application----
     @Override
     public  void run(){
         fetchUrl();
     }
 
 
-
     private void fetchUrl(){
-        scrapUrls=db.fetchLinks("50","scrap");
+        scrapUrls=siteDb.fetchLinks("50","scrap");
         System.err.println("fetching unscraped links-------");
         //============================================
         String upd="update links set scrap =\"true\" where id=";
         for(int i=0; i<scrapUrls.size(); i++){
+            
+            // id# url# thumbUrl# typ# data
+            
             String[] rec =scrapUrls.get(i).split("#");
             for(int x=0; x<2; x++){
-                int r=db.update(upd.concat(rec[0]).concat(";"));
-                System.out.println(rec[1]+"from "+Thread.currentThread().getName());
-                if(r>0){
-                    System.out.println("updated success!");
+                int r=siteDb.update(upd.concat(rec[0]).concat(";"));
+                printr("[fetchUrl]",rec[1]+"from "+Thread.currentThread().getName(),"log");
+                //===================calling the extraction procedures=================
+                type =rec[3];
+                absVidThumb=rec[2];
+                start(rec[1]);
+                //=====================================================================
+                if(!(r>0)){
+                    System.out.println("updated failed!");
                 }
-                //calling the link indexer for all links----
-
             }
         }
-        //===================================================
-
     }
-    int start()  {
 
-        System.out.printf("\n\n");
-        System.out.println("---------------Scraper----------------------");
+
+    int start(String link)  {
+
+        System.out.println("\n---------------Scraper----------------------");
         System.out.println("link- "+link);
         this.link=link;
         try{
             hostUrl = new URL(link);
-            pageInfo=as.getTitle(link);
+            pageTitle=as.getTitle(link);
         }catch (Exception e){
             System.err.println("[-errCritical-]URL is malformed, cannot create url object! ");
         }
@@ -97,30 +132,27 @@ public class MediaScraper implements Runnable {
        return 0;
     }
 
+
+
     private Document getPage(){
         try {
-            Document page = Jsoup.connect(link)
+             page = Jsoup.connect(link)
                     .userAgent("Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6")
                     .referrer("http://www.google.com")
                     .get();
-            System.err.println("[-log-]Downloaded target page successfully!");
+              printr("[getPage]","Downloaded target page successfully!","message");
             return page;
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-
     }
 
-    MediaScraper setOutput(String output){
-        this.output=output;
-        return this;
-    }
+
 
     private String getAbs(String link){
          String absLink=link;
         if(!(link.contains("https://")||link.contains("http://"))){
             System.err.println("The link is not absolute... providing the absolute link..");
-            System.out.println();
             if(link.startsWith("/")){
                 absLink=absLink.strip().substring(1);
             }
@@ -159,19 +191,16 @@ public class MediaScraper implements Runnable {
             System.err.println("cannot update because link empty "+absVidSrc+" and "+absVidThumb);
 
         }if(absVidType.equalsIgnoreCase(" ")){
-            absVidType="htmlPlayer";
+            absVidType="html5VideoPlayer";
         }else{
            // db.executeUpdate( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
         }
 
     }
 
-    void setPageInfo(String data){
-        this.pageInfo=data;
-    }
 
-    //used to contorl the creation of a single file for scraping single page
 
+    //scans the webPlayers links
     String getWebPlayerLink(Document page){
 
         System.err.println("[-log-]Starting webplayer scraper!");
@@ -237,7 +266,7 @@ public class MediaScraper implements Runnable {
             }
         }if(!allowLoggingToSinglePg){
             if(!linkList.isEmpty()){
-                fh.writeData(pageInfo.concat(".txt"),new String[]{"$title$"+title});
+                fh.writeData(pageTitle.concat(".txt"),new String[]{"$title$"+title});
             }
         }
         }
@@ -250,7 +279,7 @@ public class MediaScraper implements Runnable {
             if(allowLoggingToSinglePg){
                 fh.writeData(hostUrl.getHost().concat(".txt"),new String[]{srcLink});
             }if(!allowLoggingToSinglePg){
-                fh.writeData(pageInfo.concat(".txt"),new String[]{srcLink});
+                fh.writeData(pageTitle.concat(".txt"),new String[]{srcLink});
             }
 
             // db.executeUpdate("videoData",data);
@@ -263,7 +292,6 @@ public class MediaScraper implements Runnable {
 
    private void getLinks(){
         int counter=0;
-        Document page = getPage();
         Elements href = page.select("a[href]");
         for(Element hrf : href){
             links[counter]=hrf.attr("abs:href");
@@ -272,13 +300,29 @@ public class MediaScraper implements Runnable {
         counter=0;
    }
 
-   Crawler setSingleOutput(){
-        allowLoggingToSinglePg=true;
-       return null;
-   }
 
-   void setThumbnailData(String url){
-        this.absVidThumb=url;
-   }
+
+
+
+    private void printr(String source,String message, String type){
+        if(!logging){
+            return;
+        }
+        String text = "{"+type+"}[-"+source+"-] :"+message;
+
+        if(type.equalsIgnoreCase("message")){
+            System.out.println(text);
+        } if(type.equalsIgnoreCase("warning")|| type.equalsIgnoreCase("log")){
+            System.err.println(text);
+        }
+
+    }
+    private void printr(String source,String message){
+        if(logging==false){
+            return;
+        }
+        String text = "["+source+"-] :"+message;
+        System.out.println(text);
+    }
 
 }

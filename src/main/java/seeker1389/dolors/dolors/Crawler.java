@@ -239,7 +239,7 @@ public class Crawler implements Runnable{
 
         System.out.println(Thread.currentThread().getName());
 
-       String thumbUrl="";
+
        if(link.length()>urLength){
            filteredLink=link;
        }
@@ -263,21 +263,22 @@ public class Crawler implements Runnable{
        if(filteredLink!=null){
 
            //========================================[adding link to database here]==============================
-           String type="media";
+           String type="undefined";
            String scraped="false";
            String crawled="false";
            String data="null";
+           String thumbUrl="null";
 
            if(enableThumbExtractor){
-               thumbUrl=getThumbnailData(linkElement);
-               if(!(thumbUrl.equalsIgnoreCase(""))){
-                   data="thumbnail#"+thumbUrl;
+               String tempThumbData=getThumbnailData(linkElement);
+               if(!(tempThumbData.equalsIgnoreCase(""))){
+                   thumbUrl=tempThumbData;
                }else{
                    System.err.println("thumbnail not found for the link : "+link);
                }
 
            }
-            String res[]={link,type,date,data,scraped,crawled};
+            String res[]={link,type,thumbUrl,date,data,scraped,crawled};
             db.executeUpdate("links",res);
             System.out.println("Link added to Database: "+link);
             //===============================================[end]=================================================

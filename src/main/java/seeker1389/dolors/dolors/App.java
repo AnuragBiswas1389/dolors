@@ -8,13 +8,14 @@ import java.util.Scanner;
 public class App {
     public static void main(String[] args) throws MalformedURLException {
 
-        String url ="https://aagmaal.life/";
+        String url =" https://aagmaal.life/page/2/";
         URL sourceUrl = new URL(url);
 
         String dbname=sourceUrl.getHost().replace('.','_');
          Runnable r1 = new Crawler(url, new Db("root","seeker1389",dbname))
                 .enableThumbnailExtractor()
-                .crawlOnlyBaseUrl();
+                .crawlOnlyBaseUrl()
+                 .crawlSequentially();
 
 
 
