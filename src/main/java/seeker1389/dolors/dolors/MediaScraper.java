@@ -13,6 +13,9 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 
@@ -33,7 +36,7 @@ public class MediaScraper implements Runnable {
 
 
     private Document page=null; //Target page of the current scraper instance
-    private String absVidThumb="notFound";// video thumbnail url
+    private String thumb="notFound";// video thumbnail url
     private  String type ="undefined";//type of the source url
     private String pageTitle="undefined"; //page title of the current page
 
@@ -49,10 +52,9 @@ public class MediaScraper implements Runnable {
 
     private LinkedHashSet<String>linkList= new LinkedHashSet<>();
 
-    private String players[]={"dood","streamtape","streamtapeadblockuser","sbanh","vtube"};
-    private String blockedPlayers[]={"tsyndicate"};
-
-
+    private ArrayList<String> players=new ArrayList<String>();
+   // String st = "(id int NOT NULL AUTO_INCREMENT, url varchar(225), type varchar(225), date varchar(225), data varchar(225), data2 varchar(225), data3 varchar(225), PRIMARY KEY(id))";
+    private ArrayList<String> spam=new ArrayList<String>();
 
     private ArrayList<String> scrapUrls = new ArrayList<String>();
 
@@ -61,9 +63,17 @@ public class MediaScraper implements Runnable {
     MediaScraper(Db db){
         this.siteDb=db;
     }
-    MediaScraper(Db db,Db scraperDb){
-        this.siteDb=db;
-        this.scraperDb=scraperDb;
+    MediaScraper(String url, String username, String password){
+        URL sourceUrl = null;
+        try {
+            sourceUrl = new URL(url);
+        } catch (MalformedURLException e) {
+            throw new RuntimeException(e);
+        }
+        String dbname=sourceUrl.getHost().replace('.','_');
+        this.siteDb=new Db(username, password,dbname);
+        this.scraperDb=new Db(username, password,"scraper");
+        assignDB();
     }
     MediaScraper setOutput(String output){
         this.output=output;
@@ -103,8 +113,9 @@ public class MediaScraper implements Runnable {
                 int r=siteDb.update(upd.concat(rec[0]).concat(";"));
                 printr("[fetchUrl]",rec[1]+"from "+Thread.currentThread().getName(),"log");
                 //===================calling the extraction procedures=================
+                siteDb.setScraped(rec[0]);
                 type =rec[3];
-                absVidThumb=rec[2];
+                thumb=rec[2];
                 start(rec[1]);
                 //=====================================================================
                 if(!(r>0)){
@@ -113,6 +124,8 @@ public class MediaScraper implements Runnable {
             }
         }
     }
+
+
 
 
     int start(String link)  {
@@ -126,13 +139,10 @@ public class MediaScraper implements Runnable {
         }catch (Exception e){
             System.err.println("[-errCritical-]URL is malformed, cannot create url object! ");
         }
-       Document page = getPage();
-//     getElements(page);   temporaryly
-       getWebPlayerLink(page);
-       return 0;
+        getPage();
+        extractorStarter();
+        return 0;
     }
-
-
 
     private Document getPage(){
         try {
@@ -147,6 +157,20 @@ public class MediaScraper implements Runnable {
         }
     }
 
+
+    //initiate the extractor -------
+    private void extractorStarter(){
+
+        System.out.println("----initiated extractor ----- "+link);
+        GetHtmlPlayer();
+    }
+
+
+    private void assignDB(){
+        players=scraperDb.getScraperTables("select * from players","player");
+        spam=scraperDb.getScraperTables("select * from spam","url");
+        System.out.println("loaded the spam and players db into memory!");
+    }
 
 
     private String getAbs(String link){
@@ -164,37 +188,42 @@ public class MediaScraper implements Runnable {
         return absLink;
     }
 
-    void getElements(Document page){
-         String vidSrc="not found", vidThumb="not found", vidType="not found";
+     private int GetHtmlPlayer(){
+
+     //   System.out.println(page);
+        String vidSrc="not found", vidThumb="not found", vidType="not found";
 
         Elements video = page.getElementsByTag("video");
+         System.out.println(video);
         for(Element vid : video){
             Elements src=vid.getElementsByTag("source");
-
             vidSrc = src.attr("src");
             vidThumb = video.attr("poster");
-            vidType = video.attr("type");
+            vidType = src.attr("type");
         }
-        //checking if the video link is an indirect link
-        System.out.println("------------------------------------------------");
-        System.out.println(getAbs(vidSrc));
-        System.out.println(getAbs(vidThumb));
-        System.out.println(vidType);
-        System.out.println("------------------------------------------------");
 
-        String absVidSrc=getAbs(vidSrc);
-        String absVidThumb=getAbs(vidThumb);
-        String absVidType=vidType;
+//        String absVidSrc=getAbs(vidSrc);
+//        String absVidThumb=getAbs(vidThumb);
+//        String absVidType=vidType;
+
         String site=hostUrl.getHost();
 
-        if(absVidSrc.equalsIgnoreCase(" ")||absVidThumb.equalsIgnoreCase(" ")){
-            System.err.println("cannot update because link empty "+absVidSrc+" and "+absVidThumb);
-
-        }if(absVidType.equalsIgnoreCase(" ")){
-            absVidType="html5VideoPlayer";
-        }else{
-           // db.executeUpdate( "video",new String[]{id, absVidSrc,site,absVidThumb,absVidType});
-        }
+//        if(absVidSrc.length()<1){
+//            //fatal condition because no video link is found so no meaning of further processing...
+//            System.err.println("cannot update because, link empty "+absVidSrc+" and "+absVidThumb);
+//            return 0;
+//        }
+//        if(absVidType.equalsIgnoreCase(" ")){
+//            absVidType="html5VideoPlayer";
+//        }
+//        if(absVidThumb.equalsIgnoreCase(" ")){
+//            //assigning the previous extracted thumb if a poster is not found!
+//             absVidType=thumb;
+//        }
+        //=====================================data exit point==================================
+        System.out.println(vidSrc);
+        //=====================================data exit point==================================
+        return 1;
 
     }
 
@@ -221,6 +250,7 @@ public class MediaScraper implements Runnable {
         }
         for(Element ifr : iframe){
             frameLink = ifr.attr("src");
+
             for(String player :players){
                 if (frameLink.contains(player)){
                     webPlayerLink = frameLink;
@@ -232,7 +262,7 @@ public class MediaScraper implements Runnable {
             }
             if(frameLink.startsWith("/")){
                 String absLink="https://"+hostUrl.getHost().concat(frameLink);
-                for (String blkPlayers:blockedPlayers){
+                for (String blkPlayers:spam){
                     if(!absLink.contains(blkPlayers)){
                         if(!linkList.contains(absLink)){
                             linkList.add(absLink);
@@ -257,16 +287,16 @@ public class MediaScraper implements Runnable {
                 }
 
         }
-        String data[]={srcLink,site,absVidThumb,title,absVidType};
+       // String data[]={srcLink,site,absVidThumb,title,absVidType};
 
         if(output.equalsIgnoreCase("text")){
             if(allowLoggingToSinglePg){
             if(!linkList.isEmpty()){
-                fh.writeData(hostUrl.getHost().concat(".txt"),new String[]{"$title$"+title,"$thumb$"+absVidThumb});
+                //fh.writeData(hostUrl.getHost().concat(".txt"),new String[]{"$title$"+title,"$thumb$"+absVidThumb});
             }
         }if(!allowLoggingToSinglePg){
             if(!linkList.isEmpty()){
-                fh.writeData(pageTitle.concat(".txt"),new String[]{"$title$"+title});
+                //fh.writeData(pageTitle.concat(".txt"),new String[]{"$title$"+title});
             }
         }
         }

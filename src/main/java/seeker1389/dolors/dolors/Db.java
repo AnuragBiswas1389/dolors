@@ -5,8 +5,9 @@ import java.util.ArrayList;
 
 public class Db {
 
-   private String userName="root",password="root", dburl= "jdbc:mysql://localhost:3306/";;
-   private Connection con;
+    private String userName="root",password="root", dburl= "jdbc:mysql://localhost:3306/";;
+    private Connection con;
+    private Connection scraperConn;
     private ResultSet rs;
     boolean dbExitst=false;
     boolean scraperDb=false;
@@ -33,6 +34,7 @@ public class Db {
         try {
             Class.forName("oracle.jdbc.driver.OracleDriver");
             con = (Connection) DriverManager.getConnection(dburl, this.userName, this.password);
+            scraperConn = (Connection) DriverManager.getConnection(dburl, this.userName, this.password);
             rs = con.getMetaData().getCatalogs();
 
             while (rs.next()){
@@ -41,8 +43,14 @@ public class Db {
                    dbExitst=true;
                    Statement st = con.createStatement();
                    st.executeUpdate("use "+dbName);
-
                 }
+                //check the scraper db...
+                if(rs.getString(1).equalsIgnoreCase("scraper")){
+                   scraperDb=true;
+                   Statement scraperStat= scraperConn.createStatement();
+                   scraperStat.executeUpdate("use scraper");
+                }
+
             }
             createDB();
 
@@ -56,16 +64,31 @@ public class Db {
 
 
    private void createDB(){
-       if(dbExitst==true){
-           return;
-       }
        try {
-           System.out.println("trying to create database "+dbName);
-           Statement stat = con.createStatement();
-           stat.executeUpdate("create database "+dbName+";");
-           stat.executeUpdate("use "+dbName);
-           createTable("links");
-           System.out.println("database created!");
+      if (!dbExitst) {
+            System.out.println("trying to create crawler database " + dbName);
+              Statement stat = con.createStatement();
+              stat.executeUpdate("create database " + dbName + ";");
+              stat.executeUpdate("use " + dbName);
+              System.err.println("creating initial tables for the database");
+              //creating tables for crawling---
+              createTable("links", con);
+              //creating tables for scraping---
+              createTable("scrap",con);
+              createTable("videoScraped",con);
+              System.out.println("Crawler database created!");
+           }
+           if(!scraperDb){
+               System.out.println("trying to create database " + dbName);
+               Statement scraperStat = scraperConn.createStatement();
+               scraperStat.executeUpdate("create database scraper ;");
+               scraperStat.executeUpdate("use scraper");
+               //---create tables for scraper----
+               createTable("players",scraperConn);
+               createTable("spam",scraperConn);
+
+               System.out.println("scraper database created!");
+           }
        } catch (SQLException e) {
            throw new RuntimeException(e);
        }
@@ -73,7 +96,7 @@ public class Db {
    }
 
   // returns a connection with any db
-  private Connection createDB(String name) {
+    private Connection createDB(String name) {
 
       Connection newConnection=null;
 
@@ -108,7 +131,7 @@ public class Db {
     return  newConnection;
 }
 
-        public void executeUpdate(String table,String args[]) {
+    public void executeUpdate(String table,String args[]) {
         String statement = createInsertStatement(table,args);
        try {
            Statement stmt = con.createStatement();
@@ -148,31 +171,38 @@ public class Db {
    }
 
 
-   private void createTable(String type){
+   private void createTable(String type, Connection con){
 
        String table=null;
 
        //Database for primary links storage -- contains all links discovered from a page (crawled and uncrawled)
        if(type.equalsIgnoreCase("links")){
-           System.out.println("creating table statement");
+           System.out.println("creating table links----");
            table="CREATE TABLE links(id int NOT NULL AUTO_INCREMENT, url varchar(225), type varchar(225), thumbnail varchar(225), date varchar(225), data varchar(225), scrap varchar(225), crawl varchar(225), PRIMARY KEY(id));";
        }
        //Database for player links storage
-       if(type.equalsIgnoreCase("playerLinks")){
-           System.out.println("creating table statement");
-           table="CREATE TABLE links(id int NOT NULL AUTO_INCREMENT, player varchar(225), type varchar(225), date varchar(225), data varchar(225), data2 varchar(225), data3 varchar(225), PRIMARY KEY(id));";
+       if(type.equalsIgnoreCase("players")){
+           System.out.println("creating table players----");
+           table="CREATE TABLE players(id int NOT NULL AUTO_INCREMENT, player varchar(225), type varchar(225), date varchar(225), data varchar(225), data2 varchar(225), data3 varchar(225), PRIMARY KEY(id));";
        }
 
        //Database for spam links storage
-       if(type.equalsIgnoreCase("spamLinks")){
-           System.out.println("creating table statement");
-           table="CREATE TABLE links(id int NOT NULL AUTO_INCREMENT, url varchar(225), type varchar(225), date varchar(225), data varchar(225), data2 varchar(225), data3 varchar(225), PRIMARY KEY(id));";
+       if(type.equalsIgnoreCase("spam")){
+           System.out.println("creating table spam----");
+           table="CREATE TABLE spam(id int NOT NULL AUTO_INCREMENT, url varchar(225), type varchar(225), date varchar(225), data varchar(225), data2 varchar(225), data3 varchar(225), PRIMARY KEY(id));";
        }
 
        //Database for scrap data links storage
        if(type.equalsIgnoreCase("scrap")){
-           System.out.println("creating table statement");
-           table="CREATE TABLE links(id int NOT NULL AUTO_INCREMENT, url varchar(225), type varchar(225), date varchar(225), data varchar(225), tags varchar(225), title varchar(225),thumbnail varchar(225), category varchar(225), hostUrl varchar(225), data2 varchar(225),PRIMARY KEY(id));";
+           System.out.println("creating table scrap----");
+           table="CREATE TABLE scrap(id int NOT NULL AUTO_INCREMENT, url varchar(225), type varchar(225), date varchar(225), data varchar(225), tags varchar(225), title varchar(225),thumbnail varchar(225), category varchar(225), hostUrl varchar(225), data2 varchar(225),PRIMARY KEY(id));";
+       }
+
+       //Database for storing scraped video
+       if(type.equalsIgnoreCase("videoScraped")){
+           System.out.println("creating table videoScraped-----");
+           //id  title(src title) src(videoLink), thumbnail, category,type, tags, sourceURl, date, data, data2
+           table="CREATE TABLE videoScraped(id int NOT NULL AUTO_INCREMENT, title varchar(225), src varchar(225),thumbnail varchar(225),category varchar(225), type varchar(225), tags varchar(225), sourceUrl varchar(225), date varchar(225), data varchar(225), data2 varchar(225),PRIMARY KEY(id));";
        }
 
 
@@ -220,16 +250,51 @@ public class Db {
         } catch (SQLException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public void setScraped(String id){
+        String query="update links set scrap =\"true\" where id= "+id+";";
+        Statement st = null;
+        try {
+            st = con.createStatement();
+            int res = st.executeUpdate(query);
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
 
     }
 
-    public boolean contains(String table, String query) {
+    public ArrayList<String> getScraperTables(String query,String column){
+        ArrayList<String> res = new ArrayList<String>();
+        String player,id;
+        try {
+            Statement st = scraperConn.createStatement();
+            ResultSet rs = st.executeQuery(query);
+            while(rs.next()){
+                player = rs.getString(column);
+               // id = (String.valueOf( rs.getInt("id")));[did not use the id ]
+                res.add(player);
+            }
+            return  res;
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+
+
+    public boolean contains(String table, String query,String db) {
         boolean result=false;
         Statement stat = null;
         String q ="select * from "+table+" where "+query+";";
         //System.out.println(q);
         try {
+        if (db.equalsIgnoreCase("crawler")) {
             stat = con.createStatement();
+        }
+        if(db.equalsIgnoreCase("scraper")){
+            stat=scraperConn.createStatement();
+        }
             ResultSet res = stat.executeQuery(q);
             if(res.next()){
                 return true;

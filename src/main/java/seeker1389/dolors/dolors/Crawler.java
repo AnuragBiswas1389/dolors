@@ -209,7 +209,7 @@ public class Crawler implements Runnable{
 
             for (Element lin : linksOnPage) {
                 String link =(lin.attr("abs:href"));
-                if(!db.contains("links","url=".concat("\"")+link.concat("\""))){
+                if(!db.contains("links","url=".concat("\"")+link.concat("\""),"crawler")){
                     filter(lin,link);
                 }else{
                    // System.err.println("[log]link Exist");
