@@ -8,7 +8,7 @@ import java.util.Scanner;
 public class App {
     public static void main(String[] args) throws MalformedURLException {
 
-        String url =" https://www.fsiblog2.com/";
+        String url =" https://www.google.com/";
         URL sourceUrl = new URL(url);
 
         String dbname=sourceUrl.getHost().replace('.','_');
